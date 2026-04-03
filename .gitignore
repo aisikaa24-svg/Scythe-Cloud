@@ -1,5 +1,6 @@
 # Ignore local secrets
 config.env
+local_secrets.env
 .env
 *.session
 extracted_cards.txt

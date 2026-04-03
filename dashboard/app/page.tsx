@@ -59,14 +59,32 @@ export default function Home() {
             <p className="text-slate-400 mt-2 font-medium tracking-wide">SHADOW CLOUD DOMINANCE: VERCEL CORE</p>
           </div>
           
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <div className="bg-slate-950/50 border border-slate-800/50 p-4 rounded-2xl flex flex-col items-center min-w-[120px]">
               <span className="text-2xl font-bold text-cyan-400">{cards.length}</span>
               <span className="text-xs text-slate-500 uppercase font-black">Assets Stored</span>
             </div>
             <button 
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const res = await fetch('/api/trigger', { method: 'POST' });
+                  if (res.ok) alert('Extraction Mission Triggered! Wait 60s and refresh.');
+                  else alert('Error triggering mission. Is GITHUB_PAT set?');
+                } catch (e) {
+                  alert('Network error while triggering extraction.');
+                }
+                setLoading(false);
+              }}
+              disabled={loading}
+              className="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 hover:text-white transition-all px-6 py-4 rounded-2xl border border-indigo-500/30 shadow-[0_0_15px_rgba(79,70,229,0.15)] font-black tracking-widest text-sm disabled:opacity-50"
+            >
+              TRIGGER EXTRACT
+            </button>
+            <button 
               onClick={fetchCards}
-              className="bg-cyan-600 hover:bg-cyan-500 transition-all p-4 rounded-2xl border border-cyan-400/30 shadow-[0_0_20px_rgba(6,182,212,0.2)] group"
+              disabled={loading}
+              className="bg-cyan-600 hover:bg-cyan-500 transition-all p-4 rounded-2xl border border-cyan-400/30 shadow-[0_0_20px_rgba(6,182,212,0.2)] group disabled:opacity-50"
             >
               <RefreshCw className={`w-6 h-6 group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} />
             </button>

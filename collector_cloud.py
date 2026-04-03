@@ -7,7 +7,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 # Load configuration
-load_dotenv('config.env')
+load_dotenv('local_secrets.env')
 
 # Telegram Config
 API_ID = os.getenv('API_ID')

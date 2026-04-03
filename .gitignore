@@ -1,0 +1,16 @@
+# Ignore local secrets
+config.env
+.env
+*.session
+extracted_cards.txt
+__pycache__/
+*.pyc
+
+# Ignore local dashboard setup
+/dashboard/node_modules/
+/dashboard/.next/
+/dashboard/out/
+/dashboard/.env.local
+/dashboard/.env.production.local
+/dashboard/.env.development.local
+/dashboard/.env.test.local

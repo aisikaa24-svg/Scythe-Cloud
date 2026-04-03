@@ -19,6 +19,7 @@ SESSION_STRING = os.getenv('SESSION_STRING')
 # Telegram Bot Config for Notifications
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+TELEGRAM_MSG_ID = os.getenv('TELEGRAM_MSG_ID')
 
 # Supabase Config
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -26,6 +27,13 @@ SUPABASE_KEY = os.getenv('SUPABASE_SECRET_KEY') # Needs the service/secret key f
 
 # Regex for card patterns
 CARD_REGEX = r'(\d{14,16}\|\d{1,2}\|\d{2,4}(?:\|\d{3,4})?\|?)'
+
+def generate_progress_bar(current, total, length=10):
+    if total == 0: return "⚪" * length + " 0%"
+    percent = (current / total)
+    filled_length = int(length * percent)
+    bar = "🔵" * filled_length + "⚪" * (length - filled_length)
+    return f"{bar} {int(percent * 100)}%"
 
 async def send_to_telegram_bot(cards):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -76,7 +84,7 @@ async def cloud_mission():
     print("Authenticated successfully via Cloud Session.")
 
     # Track status for Live Radar
-    current_status_id = None
+    current_status_id = TELEGRAM_MSG_ID # Use the ID passed from Webhook if available
     async def update_radar(text):
         nonlocal current_status_id
         if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: return
@@ -89,13 +97,14 @@ async def cloud_mission():
             else:
                 requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", 
                               json={"chat_id": TELEGRAM_CHAT_ID, "message_id": current_status_id, "text": text, "parse_mode": "Markdown"})
-        except: pass
+        except Exception as e:
+            print(f"Update failed: {e}")
 
-    await update_radar("🛰️ **SCYTHE: Mission Initiated**\nInitializing Extraction Core...")
+    await update_radar("🛰️ **SCYTHE MISSION: CONNECTED**\n---\n⚙️ **Status**: Initializing Orbit...")
+    await asyncio.sleep(1) # For visual effect
 
     cards_found = []
     total_processed = 0
-    groups_scrubbed = 0
 
     print("Scanning all dialogs for unread content...")
     
@@ -108,14 +117,20 @@ async def cloud_mission():
     total_groups = len(dialog_list)
 
     for idx, dialog in enumerate(dialog_list):
-            groups_scrubbed += 1
             count = dialog.unread_count
             print(f"Scrubbing: {dialog.name} ({count} unread)")
             
-            # Progress Update (Every 3 groups or at start/end)
-            if idx % 3 == 0 or idx == total_groups - 1:
-                progress = f"🛰️ **SCYTHE MISSION RADAR**\n---\n📂 **Scrubbing**: `{dialog.name}`\n📡 **Progress**: {idx+1}/{total_groups} Groups\n💎 **Caught**: {len(cards_found)} Vectors\n⚙️ **Status**: Active"
-                await update_radar(progress)
+            # Progress Update with Bar
+            progress_bar = generate_progress_bar(idx + 1, total_groups)
+            status_text = (
+                f"🛰️ **SCYTHE MISSION RADAR (V2)**\n"
+                f"---"
+                f"\n📡 **Target**: `{dialog.name}`"
+                f"\n📊 **Mission Progress**: {progress_bar}"
+                f"\n💎 **Vectors Caught**: `{len(cards_found)}`"
+                f"\n⚙️ **Status**: Scrubbing Vectors..."
+            )
+            await update_radar(status_text)
             
             processed_in_dialog = 0
             max_id = 0
@@ -130,6 +145,9 @@ async def cloud_mission():
                     if matches:
                         for card in matches:
                             cards_found.append(card)
+                            # Update count every 5 cards for extra "liveness"
+                            if len(cards_found) % 5 == 0:
+                                await update_radar(status_text)
                 
                 if processed_in_dialog % 500 == 0:
                     print(f"  > Progress: {processed_in_dialog}/{count} processed...")
@@ -141,7 +159,13 @@ async def cloud_mission():
             print(f"  > [DONE] {dialog.name} synchronized.")
 
     # Finalize Radar before sending file
-    await update_radar(f"✅ **SCYTHE MISSION COMPLETE**\n---\n💎 **Total Vectors**: {len(set(cards_found))}\n📂 **Total Groups**: {total_groups}\n⚙️ **Status**: Standby")
+    await update_radar(
+        f"✅ **SCYTHE MISSION SUCCESSFUL**\n"
+        f"---"
+        f"\n💎 **Total Vectors**: `{len(set(cards_found))}`"
+        f"\n📂 **Groups Cleaned**: `{total_groups}`"
+        f"\n⚙️ **Core Status**: Standby"
+    )
 
     # Deduplicate and sync to Supabase
     if cards_found:

@@ -3,7 +3,12 @@ name: Project SCYTHE - Scraper Engine
 on:
   schedule:
     - cron: '0 * * * *' # Every 1 hour
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch:
+    inputs:
+      telegram_msg_id:
+        description: 'The ID of the Telegram message to update'
+        required: false
+        default: ''
 
 jobs:
   scrape:
@@ -30,4 +35,5 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_MSG_ID: ${{ github.event.inputs.telegram_msg_id }}
         run: python collector_cloud.py

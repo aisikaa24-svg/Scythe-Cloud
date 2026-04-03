@@ -21,8 +21,8 @@ export async function POST(request: Request) {
     }
 
     if (message.toLowerCase() === '/run' || message.toLowerCase() === '/extract') {
-      // 1. Reply to user: Mission Start
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      // 1. Reply to user: Mission Start (and capture its ID)
+      const telegramRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -30,8 +30,10 @@ export async function POST(request: Request) {
           text: '🚀 SCYTHE: Extraction Mission Initialized! Stand by for vectors...'
         })
       });
+      const sentMsg = await telegramRes.json();
+      const telegramMsgId = sentMsg.result?.message_id;
 
-      // 2. Trigger GitHub Action
+      // 2. Trigger GitHub Action with the Message ID as input
       const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/${workflowId}/dispatches`, {
         method: 'POST',
         headers: {
@@ -39,7 +41,12 @@ export async function POST(request: Request) {
           'Authorization': `Bearer ${GITHUB_PAT}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ref: 'main' })
+        body: JSON.stringify({ 
+          ref: 'main',
+          inputs: {
+            telegram_msg_id: telegramMsgId ? String(telegramMsgId) : ''
+          }
+        })
       });
 
       if (!response.ok) {

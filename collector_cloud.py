@@ -75,15 +75,47 @@ async def cloud_mission():
         
     print("Authenticated successfully via Cloud Session.")
 
+    # Track status for Live Radar
+    current_status_id = None
+    async def update_radar(text):
+        nonlocal current_status_id
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: return
+        
+        try:
+            if current_status_id is None:
+                r = requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", 
+                                  json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"})
+                current_status_id = r.json().get('result', {}).get('message_id')
+            else:
+                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", 
+                              json={"chat_id": TELEGRAM_CHAT_ID, "message_id": current_status_id, "text": text, "parse_mode": "Markdown"})
+        except: pass
+
+    await update_radar("🛰️ **SCYTHE: Mission Initiated**\nInitializing Extraction Core...")
+
     cards_found = []
     total_processed = 0
+    groups_scrubbed = 0
 
     print("Scanning all dialogs for unread content...")
     
-    async for dialog in client.iter_dialogs():
-        if dialog.unread_count > 0:
+    # Pre-count dialogs for progress %
+    dialog_list = []
+    async for d in client.iter_dialogs():
+        if d.unread_count > 0:
+            dialog_list.append(d)
+    
+    total_groups = len(dialog_list)
+
+    for idx, dialog in enumerate(dialog_list):
+            groups_scrubbed += 1
             count = dialog.unread_count
             print(f"Scrubbing: {dialog.name} ({count} unread)")
+            
+            # Progress Update (Every 3 groups or at start/end)
+            if idx % 3 == 0 or idx == total_groups - 1:
+                progress = f"🛰️ **SCYTHE MISSION RADAR**\n---\n📂 **Scrubbing**: `{dialog.name}`\n📡 **Progress**: {idx+1}/{total_groups} Groups\n💎 **Caught**: {len(cards_found)} Vectors\n⚙️ **Status**: Active"
+                await update_radar(progress)
             
             processed_in_dialog = 0
             max_id = 0
@@ -107,6 +139,9 @@ async def cloud_mission():
             if max_id:
                 await client.send_read_acknowledge(dialog.id, max_id=max_id)
             print(f"  > [DONE] {dialog.name} synchronized.")
+
+    # Finalize Radar before sending file
+    await update_radar(f"✅ **SCYTHE MISSION COMPLETE**\n---\n💎 **Total Vectors**: {len(set(cards_found))}\n📂 **Total Groups**: {total_groups}\n⚙️ **Status**: Standby")
 
     # Deduplicate and sync to Supabase
     if cards_found:

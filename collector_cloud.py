@@ -144,6 +144,14 @@ async def cloud_mission():
                     matches = re.findall(CARD_REGEX, msg.text)
                     if matches:
                         for card in matches:
+                            # Normalize year (e.g. 28 -> 2028)
+                            parts = card.split('|')
+                            if len(parts) >= 3:
+                                year = parts[2].strip()
+                                if len(year) == 2:
+                                    parts[2] = "20" + year
+                                card = "|".join(parts)
+                                
                             cards_found.append(card)
                             # Update count every 5 cards for extra "liveness"
                             if len(cards_found) % 5 == 0:
@@ -181,6 +189,10 @@ async def cloud_mission():
                 pass
                 
         print("Success: Database synchronized.")
+        # Release the mission lock
+        try:
+            supabase.table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
+        except: pass
         # Send to Telegram Bot as .txt attachment
         await send_to_telegram_bot(unique_cards)
     else:

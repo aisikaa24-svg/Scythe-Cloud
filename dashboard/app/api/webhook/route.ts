@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -20,7 +21,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true }); // Acknowledge message silently
     }
 
-    if (message.toLowerCase() === '/run' || message.toLowerCase() === '/extract') {
+    const lowerMsg = message.toLowerCase();
+
+    // 1. Handle Unlock Command
+    if (lowerMsg === '/unlock') {
+      await supabase.from("system_settings").upsert({ key: "scraper_locked", value: "false" });
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: '🔓 SCYTHE: Mission Lock Reset. System Ready.' })
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (lowerMsg === '/run' || lowerMsg === '/extract') {
+      // Check for Active Mission Lock
+      const { data: lockData } = await supabase.from("system_settings").select("value").eq("key", "scraper_locked").single();
+      
+      if (lockData?.value === "true") {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            chat_id: chatId, 
+            text: '⚠️ MISSION BLOCKED: An extraction is already in progress. Please wait for completion.' 
+          })
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      // Set Lock
+      await supabase.from("system_settings").upsert({ key: "scraper_locked", value: "true" });
+
       // 1. Reply to user: Mission Start (and capture its ID)
       const telegramRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',

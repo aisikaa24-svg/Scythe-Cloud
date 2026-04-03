@@ -27,7 +27,6 @@ if ($secrets.Count -eq 0) {
 foreach ($name in $secrets.Keys) {
     Write-Host "Setting secret: $name..." -NoNewline
     $value = $secrets[$name]
-    # Use pipe to send value to gh CLI
     $value | gh secret set $name --repo aisikaa24-svg/Scythe-Cloud
     if ($LASTEXITCODE -eq 0) {
         Write-Host " [SUCCESS]" -ForegroundColor Green

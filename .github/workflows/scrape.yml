@@ -2,7 +2,7 @@ name: Project SCYTHE - Scraper Engine
 
 on:
   schedule:
-    - cron: '0 * * * *' # Every 1 hour
+    - cron: '0 0 * * *' # Every 24 hours
   workflow_dispatch:
     inputs:
       telegram_msg_id:

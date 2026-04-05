@@ -3,6 +3,7 @@ import re
 import asyncio
 import tempfile
 import requests
+import random
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from supabase import create_client, Client
@@ -27,6 +28,42 @@ SUPABASE_KEY = os.getenv('SUPABASE_SECRET_KEY') # Needs the service/secret key f
 
 # Regex for card patterns
 CARD_REGEX = r'(\d{14,16}\|\d{1,2}\|\d{2,4}(?:\|\d{3,4})?\|?)'
+
+def is_luhn_valid(number):
+    """Standard Luhn MOD-10 algorithm."""
+    digits = [int(d) for d in str(number)]
+    checksum = 0
+    reverse_digits = digits[::-1]
+    for i, d in enumerate(reverse_digits):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        checksum += d
+    return checksum % 10 == 0
+
+def generate_luhn_valid_extrap(prefix, target_len=16):
+    """Generates a random valid suffix that satisfies the Luhn algorithm."""
+    suffix_len = target_len - len(prefix)
+    if suffix_len <= 0: return prefix
+    
+    while True:
+        # Generate target_len - 1 digits
+        mid_suffix = "".join([str(random.randint(0, 9)) for _ in range(suffix_len - 1)])
+        candidate_prefix = prefix + mid_suffix
+        
+        # Calculate check digit
+        digits = [int(d) for d in candidate_prefix]
+        total_sum = 0
+        for i, d in enumerate(reversed(digits)):
+            # Double every second digit from the right (check digit is at index 0 from right)
+            if i % 2 == 0:
+                d *= 2
+                if d > 9: d -= 9
+            total_sum += d
+        
+        check_digit = (10 - (total_sum % 10)) % 10
+        return candidate_prefix + str(check_digit)
 
 def generate_progress_bar(current, total, length=10):
     if total == 0: return "⚪" * length + " 0%"
@@ -147,6 +184,22 @@ async def cloud_mission():
                             # Normalize year (e.g. 28 -> 2028)
                             parts = card.split('|')
                             if len(parts) >= 3:
+                                # First, clean the card number
+                                card_num = parts[0].strip()
+                                
+                                # Filter: Only Visa (4) or MasterCard (5)
+                                if not (card_num.startswith('4') or card_num.startswith('5')):
+                                    continue # Skip Amex, Discover, etc.
+
+                                if not is_luhn_valid(card_num):
+                                    continue # Skip invalid vectors
+                                
+                                # Extrapolate: Replace last 4 with random valid suffix
+                                if len(card_num) >= 15:
+                                    prefix = card_num[:-4]
+                                    parts[0] = generate_luhn_valid_extrap(prefix, target_len=len(card_num))
+                                
+                                # Year normalization
                                 year = parts[2].strip()
                                 if len(year) == 2:
                                     parts[2] = "20" + year

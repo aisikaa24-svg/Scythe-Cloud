@@ -203,8 +203,18 @@ async def cloud_mission():
                                 year = parts[2].strip()
                                 if len(year) == 2:
                                     parts[2] = "20" + year
-                                card = "|".join(parts)
                                 
+                                # CVV Injection Logic
+                                if len(parts) < 4 or not parts[3].strip():
+                                    injected_cvv = "".join([str(random.randint(0, 9)) for _ in range(3)])
+                                    if len(parts) < 4:
+                                        parts.append(injected_cvv)
+                                    else:
+                                        parts[3] = injected_cvv
+                                
+                                # Finalize vector
+                                card = "|".join([p.strip() for p in parts if p.strip()]) 
+                            
                             cards_found.append(card)
                             # Update count every 5 cards for extra "liveness"
                             if len(cards_found) % 5 == 0:

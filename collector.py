@@ -1,6 +1,7 @@
 import os
 import re
 import asyncio
+import random
 from telethon import TelegramClient, events
 from dotenv import load_dotenv
 
@@ -14,6 +15,19 @@ PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 # Regex for card patterns (Number|Month|Year|Optional_CVV|Optional_Pipe)
 # Designed for peak extraction: 14-16 digits followed by pipes and separators.
 CARD_REGEX = r'(\d{14,16}\|\d{1,2}\|\d{2,4}(?:\|\d{3,4})?\|?)'
+
+def is_luhn_valid(number):
+    """Standard Luhn MOD-10 algorithm."""
+    digits = [int(d) for d in str(number)]
+    checksum = 0
+    reverse_digits = digits[::-1]
+    for i, d in enumerate(reverse_digits):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        checksum += d
+    return checksum % 10 == 0
 
 async def collect_and_clean():
     print("--- [ Project SCYTHE: Telegram Card Extractor ] ---")
@@ -52,6 +66,31 @@ async def collect_and_clean():
                     matches = re.findall(CARD_REGEX, msg.text)
                     if matches:
                         for card in matches:
+                            # Normalize and inject data
+                            parts = card.split('|')
+                            if len(parts) >= 3:
+                                card_num = parts[0].strip()
+                                
+                                # Basic normalization (consistent with cloud mission)
+                                if not is_luhn_valid(card_num):
+                                    continue
+                                
+                                # Year normalization
+                                year = parts[2].strip()
+                                if len(year) == 2:
+                                    parts[2] = "20" + year
+                                
+                                # CVV Injection Logic
+                                if len(parts) < 4 or not parts[3].strip():
+                                    injected_cvv = "".join([str(random.randint(0, 9)) for _ in range(3)])
+                                    if len(parts) < 4:
+                                        parts.append(injected_cvv)
+                                    else:
+                                        parts[3] = injected_cvv
+                                
+                                # Save cleaned vector
+                                card = "|".join([p.strip() for p in parts if p.strip()])
+                            
                             cards_found.append(card)
                             extracted_count += 1
                 

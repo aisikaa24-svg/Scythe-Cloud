@@ -2,7 +2,6 @@ name: Project SCYTHE - Scraper Engine
 
 on:
   schedule:
-  schedule:
     - cron: '30 */6 * * *' # Every 6 hours (more frequent but smaller batches)
   workflow_dispatch:
     inputs:

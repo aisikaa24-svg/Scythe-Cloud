@@ -2,7 +2,8 @@ name: Project SCYTHE - Scraper Engine
 
 on:
   schedule:
-    - cron: '0 */12 * * *' # Every 12 hours
+  schedule:
+    - cron: '30 */6 * * *' # Every 6 hours (more frequent but smaller batches)
   workflow_dispatch:
     inputs:
       telegram_msg_id:
@@ -25,6 +26,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+
+      - name: Stealth Delay (Human Jitter)
+        run: |
+          # Wait between 1 and 45 minutes to randomize start time
+          DELAY=$(( ( RANDOM % 2700 )  + 1 ))
+          echo "Waiting for ${DELAY} seconds..."
+          sleep ${DELAY}
 
       - name: Run Scraper
         env:

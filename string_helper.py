@@ -10,8 +10,8 @@ API_ID = os.getenv('API_ID')
 API_HASH = os.getenv('API_HASH')
 
 async def generate_string():
-    # Use the existing local session file 'shadow_session'
-    client = TelegramClient('shadow_session', API_ID, API_HASH)
+    # Use the existing local session file 'scythe_user_session'
+    client = TelegramClient('scythe_user_session', API_ID, API_HASH)
     await client.connect()
     
     # Export to StringSession format

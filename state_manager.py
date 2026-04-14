@@ -15,9 +15,6 @@ class StateManager:
             try:
                 self.supabase = create_client(self.supabase_url, self.supabase_key)
             except: pass
-    def __init__(self, filename='persistence.json'):
-        self.filename = filename
-        self.state = self._load()
 
     def _load(self):
         if os.path.exists(self.filename):

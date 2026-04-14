@@ -2,7 +2,7 @@ name: Project SCYTHE - Scraper Engine
 
 on:
   schedule:
-    - cron: '30 */6 * * *' # Every 6 hours (more frequent but smaller batches)
+    - cron: '30 */12 * * *' # Every 12 hours
   workflow_dispatch:
     inputs:
       telegram_msg_id:
@@ -26,12 +26,17 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Stealth Delay (Human Jitter)
+      - name: Stealth Delay (Context Aware)
         run: |
-          # Wait between 1 and 45 minutes to randomize start time
-          DELAY=$(( ( RANDOM % 2700 )  + 1 ))
-          echo "Waiting for ${DELAY} seconds..."
-          sleep ${DELAY}
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual Mission Detected: 5s jitter."
+            sleep 5
+          else
+            # Randomized start for scheduled cycles (5 to 15 mins)
+            DELAY=$(( ( RANDOM % 600 )  + 300 ))
+            echo "Scheduled Mission: Waiting ${DELAY}s..."
+            sleep ${DELAY}
+          fi
 
       - name: Run Scraper
         env:

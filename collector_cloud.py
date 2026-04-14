@@ -171,7 +171,10 @@ async def cloud_mission():
         await sync_to_targets(staged)
         state.clear_staged_cards()
         # Unlock the scraper in Supabase for the next mission
-        create_client(SUPABASE_URL, SUPABASE_KEY).table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
+        try:
+            create_client(SUPABASE_URL, SUPABASE_KEY).table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
+        except:
+            print("Cleanup Warning: Mission completed but Supabase unlock pending due to connection glitch.")
     else:
         print("Intelligence Grid Clean: No new vectors detected.")
 

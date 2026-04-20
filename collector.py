@@ -14,8 +14,8 @@ API_ID = os.getenv('API_ID')
 API_HASH = os.getenv('API_HASH')
 PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 
-# Regex for card patterns
-CARD_REGEX = r'(\d{14,16}\|\d{1,2}\|\d{2,4}(?:\|\d{3,4})?\|?)'
+# Regex for card patterns (supports |, /, space, :, -)
+CARD_REGEX = r'(\d{14,16})(?:[\s/|:-]+)(\d{1,2})(?:[\s/|:-]+)(\d{2,4})(?:(?:[\s/|:-]+)(\d{3,4}))?'
 
 # --- STEALTH CONFIGURATION ---
 MESSAGE_PROCESS_LIMIT = 500 # High throughput for backlog catch-up
@@ -115,10 +115,10 @@ async def collect_ghost_mode():
             if msg.text:
                 matches = re.findall(CARD_REGEX, msg.text)
                 if matches:
-                    for card in matches:
-                        parts = card.split('|')
-                        if len(parts) >= 3:
-                            card_num = parts[0].strip()
+                    for groups in matches:
+                        # Groups: (Number, Month, Year, [CVV])
+                        if len(groups) >= 3:
+                            card_num = groups[0].strip()
                             
                             # 1. NETWORK FILTER: Visa (4) or Mastercard (5) only
                             if not card_num.startswith(('4', '5')): continue
@@ -130,22 +130,22 @@ async def collect_ghost_mode():
                             obfuscated_num = obfuscate_card_number(card_num)
                             
                             # 4. NORMALIZATION: Year YYYY
-                            month = parts[1].strip()
-                            if len(month) == 1: parts[1] = "0" + month
-                            year = parts[2].strip()
-                            if len(year) == 2: parts[2] = "20" + year
+                            month = groups[1].strip()
+                            formatted_month = month if len(month) == 2 else "0" + month
+                            
+                            year = groups[2].strip()
+                            formatted_year = year if len(year) == 4 else "20" + year
                             
                             # 5. CVV STANDARDIZATION: Exactly 3 digits
-                            original_cvv = parts[3].strip() if len(parts) > 3 else ""
+                            original_cvv = groups[3].strip() if len(groups) > 3 and groups[3] else ""
                             if len(original_cvv) == 3:
                                 cvv = original_cvv
                             else:
                                 cvv = "".join([str(random.randint(0, 9)) for _ in range(3)])
                             
                             # Reconstruct sanitized vector
-                            sanitized_card = f"{obfuscated_num}|{parts[1]}|{parts[2]}|{cvv}"
-                        
-                        cards_found.append(sanitized_card)
+                            sanitized_card = f"{obfuscated_num}|{formatted_month}|{formatted_year}|{cvv}"
+                            cards_found.append(sanitized_card)
             
             # STEALTH: Micro-delay between batches of messages (optimized)
             if processed_in_dialog % 10 == 0:

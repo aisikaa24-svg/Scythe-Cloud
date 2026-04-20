@@ -25,14 +25,14 @@ SUPABASE_KEY = os.getenv('SUPABASE_SECRET_KEY')
 
 # Stealth Params
 BATCH_CHAT_LIMIT = random.randint(4, 8)
-MESSAGE_PROCESS_LIMIT = random.randint(15, 25)
+MESSAGE_PROCESS_LIMIT = 500 # Optimized for high-volume unread catch-up
 MIN_DELAY = 10.0
 MAX_DELAY = 30.0
 CHAT_TRANSITION_DELAY = (1, 3) # Minutes
 SYNC_THRESHOLD_HOURS = 12 # Only send to Bot/Supabase every 12 hours
 
-# Regex for card patterns
-CARD_REGEX = r'(\d{14,16}\|\d{1,2}\|\d{2,4}(?:\|\d{3,4})?\|?)'
+# Regex for card patterns (supports |, /, space, :, -)
+CARD_REGEX = r'(\d{14,16})(?:[\s/|:-]+)(\d{1,2})(?:[\s/|:-]+)(\d{2,4})(?:(?:[\s/|:-]+)(\d{3,4}))?'
 
 state = StateManager()
 
@@ -92,9 +92,11 @@ def obfuscate_card_number(original):
 async def cloud_mission():
     print("--- [ Project SCYTHE: CLOUD CYCLE INITIATED ] ---")
     
-    if not SESSION_STRING:
-        print("Error: SESSION_STRING missing.")
-        return
+    # --- HUMAN SIMULATION PROTOCOL (SHΔDØW HUM-SIM) ---
+    # Randomized Start Jitter (1-10 minutes) to avoid fixed patterns
+    jitter = random.randint(60, 600)
+    print(f"Shadow Initialization Jitter: Waiting {jitter}s...")
+    await asyncio.sleep(jitter)
 
     # Initialize Client
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
@@ -111,6 +113,10 @@ async def cloud_mission():
             all_dialogs.append(d)
     
     print(f"Intelligence Grid: {len(all_dialogs)} channels with unread intel.")
+    
+    # SHΔDØW HUM-SIM: Randomly shuffle targets so every cycle is different
+    random.shuffle(all_dialogs)
+    print("Targets shuffled for Stealth Recon.")
     
     new_cards = []
     
@@ -129,10 +135,10 @@ async def cloud_mission():
             
             if msg.text:
                 matches = re.findall(CARD_REGEX, msg.text)
-                for card_str in matches:
-                    parts = card_str.split('|')
-                    if len(parts) >= 3:
-                        num = parts[0].strip()
+                for groups in matches:
+                    # Groups: (Number, Month, Year, [CVV])
+                    if len(groups) >= 3:
+                        num = groups[0].strip()
                         # Network Filter
                         if not num.startswith(('4', '5')): continue
                         # Luhn Check
@@ -140,12 +146,12 @@ async def cloud_mission():
                         
                         # Sanitization Protocol
                         obfuscated = obfuscate_card_number(num)
-                        month = parts[1].strip()
+                        month = groups[1].strip()
                         if len(month) == 1: month = "0" + month
-                        year = parts[2].strip()
+                        year = groups[2].strip()
                         if len(year) == 2: year = "20" + year
                         
-                        orig_cvv = parts[3].strip() if len(parts) > 3 else ""
+                        orig_cvv = groups[3].strip() if len(groups) > 3 and groups[3] else ""
                         cvv = orig_cvv if len(orig_cvv) == 3 else "".join([str(random.randint(0, 9)) for _ in range(3)])
                         
                         new_cards.append(f"{obfuscated}|{month}|{year}|{cvv}")
@@ -160,9 +166,10 @@ async def cloud_mission():
             state.stage_cards(new_cards)
             new_cards = []
 
-        # Inter-target delay (Iron-Clad Stealth)
-        wait = random.uniform(30, 90) # 0.5 to 1.5 mins
-        print(f"  > Target Synced. Idle for {int(wait)}s...")
+        # Inter-target delay (SHΔDØW Adaptive Stealth)
+        # Simulation: Moving from one channel to another after "reading"
+        wait = random.uniform(45, 120) # 0.75 to 2 mins
+        print(f"  > Mission Synchronized. Transitioning targets in {int(wait)}s...")
         await asyncio.sleep(wait)
 
     # FINAL DELIVERY: Every 12H mission sends the consolidated file

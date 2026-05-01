@@ -56,9 +56,32 @@ class StateManager:
         return self.state.get('staged_cards', [])
 
     def stage_cards(self, cards):
-        current_staged = set(self.get_staged_cards())
-        current_staged.update(cards)
-        new_list = list(current_staged)
+        """
+        Stores cards while ensuring only ONE card per BIN (first 6 digits) exists 
+        in the staged collection.
+        """
+        current_staged = self.get_staged_cards()
+        
+        # Use a dictionary to track cards by BIN
+        # bin_map: BIN (6 digits) -> Full Card String
+        bin_map = {}
+        
+        # First, populate with existing cards to maintain them
+        for card in current_staged:
+            if '|' in card:
+                bin_prefix = card.split('|')[0][:6]
+                if bin_prefix not in bin_map:
+                    bin_map[bin_prefix] = card
+        
+        # Then, add new cards only if their BIN is not already present
+        for card in cards:
+            if '|' in card:
+                bin_prefix = card.split('|')[0][:6]
+                if bin_prefix not in bin_map:
+                    bin_map[bin_prefix] = card
+        
+        new_list = list(bin_map.values())
+        
         if self.supabase:
             try:
                 self.supabase.table("system_settings").upsert({"key": "staged_vectors", "value": json.dumps(new_list)}).execute()

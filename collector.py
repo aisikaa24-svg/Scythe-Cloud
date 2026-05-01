@@ -171,13 +171,21 @@ async def collect_ghost_mode():
 
     # Save to staging
     if cards_found:
-        unique_cards = list(dict.fromkeys(cards_found))
+        # BIN-based filtering: Keep only one card per 6-digit BIN
+        bin_map = {}
+        for c in cards_found:
+            bin_prefix = c.split('|')[0][:6]
+            if bin_prefix not in bin_map:
+                bin_map[bin_prefix] = c
+        
+        unique_cards = list(bin_map.values())
         state.stage_cards(unique_cards)
+        
         # Also write to file for immediate visibility
         with open('extracted_cards.txt', 'a') as f:
             for c in unique_cards:
                 f.write(c + '\n')
-        print(f"Intelligence Staged: {len(unique_cards)} new vectors stored in extracted_cards.txt.")
+        print(f"Intelligence Staged: {len(unique_cards)} unique BIN vectors stored in extracted_cards.txt.")
     
     print("Mission Phase Complete. Final Results Stored.")
     await client.disconnect()

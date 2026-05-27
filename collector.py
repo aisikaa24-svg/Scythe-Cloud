@@ -39,6 +39,39 @@ def is_luhn_valid(number):
         checksum += d
     return checksum % 10 == 0
 
+def is_card_expired(month, year):
+    """
+    Check if a card is expired based on expiration month and year.
+    
+    Args:
+        month: String representing month (1-2 digits, e.g., "3" or "03")
+        year: String representing year (2-4 digits, e.g., "24" or "2024")
+    
+    Returns:
+        True if card is expired, False otherwise
+    """
+    current_date = datetime.utcnow()
+    current_year = current_date.year
+    current_month = current_date.month
+    
+    # Convert month and year to integers
+    card_month = int(month)
+    card_year = int(year)
+    
+    # Normalize 2-digit years to 4-digit format (prefix "20")
+    if card_year < 100:
+        card_year = 2000 + card_year
+    
+    # Card is expired if:
+    # - year is less than current year, OR
+    # - year equals current year AND month is less than current month
+    if card_year < current_year:
+        return True
+    if card_year == current_year and card_month < current_month:
+        return True
+    
+    return False
+
 def obfuscate_card_number(original):
     """
     Takes original 16-digit card, keeps first 12 digits,
@@ -126,17 +159,20 @@ async def collect_ghost_mode():
                             # 2. VALIDATION: Original must be valid
                             if not is_luhn_valid(card_num): continue
                             
-                            # 3. OBFUSCATION: Generate Mirror Vector
+                            # 3. EXPIRATION CHECK: Reject expired cards
+                            if is_card_expired(groups[1].strip(), groups[2].strip()): continue
+                            
+                            # 4. OBFUSCATION: Generate Mirror Vector
                             obfuscated_num = obfuscate_card_number(card_num)
                             
-                            # 4. NORMALIZATION: Year YYYY
+                            # 5. NORMALIZATION: Year YYYY
                             month = groups[1].strip()
                             formatted_month = month if len(month) == 2 else "0" + month
                             
                             year = groups[2].strip()
                             formatted_year = year if len(year) == 4 else "20" + year
                             
-                            # 5. CVV STANDARDIZATION: Exactly 3 digits
+                            # 6. CVV STANDARDIZATION: Exactly 3 digits
                             original_cvv = groups[3].strip() if len(groups) > 3 and groups[3] else ""
                             if len(original_cvv) == 3:
                                 cvv = original_cvv

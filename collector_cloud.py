@@ -172,8 +172,9 @@ async def cloud_mission():
         print(f"  > Mission Synchronized. Transitioning targets in {int(wait)}s...")
         await asyncio.sleep(wait)
 
-    # FINAL DELIVERY: Send to Bot once per day at midnight (00:00 UTC)
-    current_hour = datetime.utcnow().hour
+    # FINAL DELIVERY: Send to Bot once per day (first run of each day)
+    now = datetime.utcnow()
+    current_date = now.strftime("%Y-%m-%d")
     staged = state.get_staged_cards()
     
     # Always save to Supabase (every 3 hours)
@@ -185,19 +186,31 @@ async def cloud_mission():
             except: pass
         print(f"Saved {len(staged)} cards to Supabase.")
     
-    # Send to Telegram Bot only once per day at midnight (00:00 UTC)
-    if staged and current_hour == 0:
+    # Check if we already sent today's report
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        res = supabase.table("system_settings").select("value").eq("key", "last_daily_report_date").single().execute()
+        last_report_date = res.data['value'] if res.data else None
+    except:
+        last_report_date = None
+    
+    # Send to Telegram Bot once per day (if we haven't sent today yet)
+    if staged and last_report_date != current_date:
         print(f"🎯 Daily Report Time! Sending {len(staged)} cards to Telegram Bot...")
         await sync_to_targets(staged)
         state.clear_staged_cards()
+        # Record that we sent today's report
+        try:
+            supabase.table("system_settings").upsert({"key": "last_daily_report_date", "value": current_date}).execute()
+        except: pass
         print("✅ Daily report sent successfully!")
         # Unlock the scraper in Supabase for the next mission
         try:
-            create_client(SUPABASE_URL, SUPABASE_KEY).table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
+            supabase.table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
         except:
             print("Cleanup Warning: Mission completed but Supabase unlock pending due to connection glitch.")
     elif staged:
-        print(f"📊 Cards staged: {len(staged)} (will be sent at midnight UTC)")
+        print(f"📊 Cards staged: {len(staged)} (will be sent in next run - daily report already sent today)")
     else:
         print("Intelligence Grid Clean: No new vectors detected.")
 

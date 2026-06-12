@@ -2,6 +2,22 @@ import json
 import os
 from supabase import create_client, Client
 
+def is_luhn_valid(number):
+    """Standard Luhn MOD-10 algorithm."""
+    try:
+        digits = [int(d) for d in str(number)]
+        checksum = 0
+        reverse_digits = digits[::-1]
+        for i, d in enumerate(reverse_digits):
+            if i % 2 == 1:
+                d *= 2
+                if d > 9:
+                    d -= 9
+            checksum += d
+        return checksum % 10 == 0
+    except:
+        return False
+
 class StateManager:
     def __init__(self, filename='persistence.json'):
         self.filename = filename
@@ -48,12 +64,30 @@ class StateManager:
             self.save()
 
     def get_staged_cards(self):
+        raw_cards = []
         if self.supabase:
             try:
                 res = self.supabase.table("system_settings").select("value").eq("key", "staged_vectors").single().execute()
-                if res.data: return json.loads(res.data['value'])
+                if res.data: raw_cards = json.loads(res.data['value'])
             except: pass
-        return self.state.get('staged_cards', [])
+        if not raw_cards:
+            raw_cards = self.state.get('staged_cards', [])
+        # Filter out cards with invalid Luhn
+        valid = []
+        for card in raw_cards:
+            if '|' in card:
+                num = card.split('|')[0]
+                if is_luhn_valid(num):
+                    valid.append(card)
+        # Sync back to storage if we removed any invalid cards
+        if len(valid) != len(raw_cards):
+            self.state['staged_cards'] = valid
+            if self.supabase:
+                try:
+                    self.supabase.table("system_settings").upsert({"key": "staged_vectors", "value": json.dumps(valid)}).execute()
+                except: pass
+            self.save()
+        return valid
 
     def stage_cards(self, cards):
         """
@@ -78,7 +112,10 @@ class StateManager:
             if '|' in card:
                 bin_prefix = card.split('|')[0][:6]
                 if bin_prefix not in bin_map:
-                    bin_map[bin_prefix] = card
+                    # Validate Luhn on incoming cards as a safety net
+                    num = card.split('|')[0]
+                    if is_luhn_valid(num):
+                        bin_map[bin_prefix] = card
         
         new_list = list(bin_map.values())
         

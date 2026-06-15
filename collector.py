@@ -139,8 +139,8 @@ async def collect_ghost_mode():
         processed_in_dialog = 0
         current_max_id = last_id
         
-        # Iter_messages from newest to oldest (default) 
-        async for msg in client.iter_messages(dialog.id, limit=unread_to_process):
+        # Iter_messages from oldest to newest using reverse=True and min_id 
+        async for msg in client.iter_messages(dialog.id, limit=unread_to_process, min_id=last_id, reverse=True):
             processed_in_dialog += 1
             if msg.id > current_max_id:
                 current_max_id = msg.id

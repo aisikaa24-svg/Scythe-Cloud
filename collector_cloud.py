@@ -150,7 +150,7 @@ async def cloud_mission():
         processed = 0
         current_max = last_id
         
-        async for msg in client.iter_messages(dialog.id, limit=limit):
+        async for msg in client.iter_messages(dialog.id, limit=limit, min_id=last_id, reverse=True):
             processed += 1
             if msg.id > current_max: current_max = msg.id
             
